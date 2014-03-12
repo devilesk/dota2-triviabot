@@ -1,4 +1,4 @@
-global.config = require("./config_staging");
+global.config = require("./config");
 
 var steam = require("steam"),
     path = require("path"),
