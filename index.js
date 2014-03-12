@@ -40,7 +40,7 @@ var onSteamLogOn = function onSteamLogOn(){
 		Dota2.joinChat(config.channel);
 		Dota2.joinChat(config.ownerChannel);
 		setTimeout(function(){
-			Dota2.sendMessage(config.channel, config.steam_name + " has entered the channel. I now accept item donations. Friend me and send a trade request!\nTable of stats now up at dotatrivia.com/stats. Updated hourly.");
+			Dota2.sendMessage(config.channel, config.steam_name + " has entered the channel.\nStats page and forum at dotatrivia.com.");
 			BotClient.started = true;
 			BotClient.triviaClient.start();
 		}, 3000);
