@@ -1,6 +1,7 @@
 global.config = require("./config_staging");
 
 var steam = require("steam"),
+    path = require("path"),
     util = require("util"),
     fs = require("fs"),
     dota2 = require("../"),
@@ -14,7 +15,7 @@ var steam = require("steam"),
 	mongoDb;
 	
 // logging
-var stdo = require('fs').createWriteStream(config.logsPath + '/log.txt');
+/*var stdo = require('fs').createWriteStream(config.logsPath + '/log.txt');
 var stderrlog = require('fs').createWriteStream(config.logsPath + '/error.txt');
 process.stdout.write = (function(write) {
         return function(string, encoding, fd) {
@@ -26,7 +27,7 @@ process.stderr.write = (function(write) {
                 stderrlog.write(string);
         }
 })(process.stderr.write)
-
+*/
 /* Steam logic */
 var onSteamLogOn = function onSteamLogOn(){
 	bot.setPersonaState(steam.EPersonaState.Busy); // to display your bot's status as "Online"
@@ -39,7 +40,7 @@ var onSteamLogOn = function onSteamLogOn(){
 		Dota2.joinChat(config.channel);
 		Dota2.joinChat(config.ownerChannel);
 		setTimeout(function(){
-			Dota2.sendMessage(config.channel, config.steam_name + " has entered the channel. I now accept item donations. Friend me and send a trade request!\nTable of stats now up at http://www.devilesk.com/dota2/trivia/stats/. Updated hourly.");
+			Dota2.sendMessage(config.channel, config.steam_name + " has entered the channel. I now accept item donations. Friend me and send a trade request!\nTable of stats now up at dotatrivia.com/stats. Updated hourly.");
 			BotClient.started = true;
 			BotClient.triviaClient.start();
 		}, 3000);
@@ -72,11 +73,11 @@ var onSteamLogOn = function onSteamLogOn(){
 },
 onSteamSentry = function onSteamSentry(sentry) {
 	util.log("Received sentry.");
-	require('fs').writeFileSync('sentry', sentry);
+	fs.writeFile(path.resolve(__dirname,'sentry'), sentry);
 },
 onSteamServers = function onSteamServers(servers) {
 	util.log("Received servers.");
-	fs.writeFile('servers', JSON.stringify(servers));
+	fs.writeFile(path.resolve(__dirname,'servers'), JSON.stringify(servers));
 },
 onWebSessionID = function onWebSessionID(webSessionID) {
 	util.log("Received web session id.");
@@ -157,7 +158,7 @@ var logOnDetails = {
     "password": config.steam_pass,
 };
 if (config.steam_guard_code) logOnDetails.authCode = config.steam_guard_code;
-var sentry = fs.readFileSync('sentry');
+var sentry = fs.readFileSync(path.resolve(__dirname,'sentry'));
 if (sentry.length) logOnDetails.shaSentryfile = sentry;
 
 // Connect to the db and login
@@ -207,12 +208,13 @@ steamTrade.on('ready', onSteamTradeReady)
 	.on('end', onSteamTradeEnd);
 
 // command line input
-process.stdin.resume();
+/*process.stdin.resume();
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', function (chunk) {
 	process.stdout.write('data: ' + chunk);
 	BotClient.onChatMessage('channel', config.ownerChannel, chunk.trim('\n'), {accountId:config.ownerId,personaName:'devilesk'});
 });
+*/
 
 //Test Steam Reconnect
 /*setTimeout(function() {

@@ -1,4 +1,5 @@
 var fs = require("fs");
+var path = require("path");
 
 String.prototype.shuffle = function () {
     var a = this.split(""),
@@ -174,7 +175,7 @@ Trivia.prototype.getQuestion = function(callback) {
 	switch (type) {
 		case 0:
 			if (self.wordListData.length == 0) {
-				fs.readFile(config.wordListPath, 'utf8', function(err, data) {
+				fs.readFile(path.resolve(__dirname,config.wordListPath), 'utf8', function(err, data) {
 					if (err) throw err;
 					self.wordListData = data.trim('\n').split('\n').shuffle();
 					console.log(self.wordListData.length);
@@ -191,7 +192,7 @@ Trivia.prototype.getQuestion = function(callback) {
 		break;
 /*		case 1:
 			if (self.sortListData.length == 0) {
-				fs.readFile(config.sortListPath, 'utf8', function(err, data) {
+				fs.readFile(path.resolve(__dirname,config.sortListPath), 'utf8', function(err, data) {
 					if (err) throw err;
 					self.sortListData = data.trim('\n').split('\n').shuffle();
 					console.log(self.sortListData.length);
@@ -207,7 +208,7 @@ Trivia.prototype.getQuestion = function(callback) {
 		break;*/
 		default:
 			if (self.questionData.length == 0) {
-				fs.readFile(config.questionListPath, 'utf8', function(err, data) {
+				fs.readFile(path.resolve(__dirname,config.questionListPath), 'utf8', function(err, data) {
 					if (err) throw err;
 					self.questionData = data.trim('\n').split('\n').shuffle();
 					console.log(self.questionData.length);

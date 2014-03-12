@@ -1,0 +1,1 @@
+Directory where mongodump outputs. Specified by dumpPath in config file

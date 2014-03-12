@@ -1,4 +1,5 @@
-var http = require('http');
+var http = require("http");
+var path = require("path");
 var fs = require("fs");
 var util = require("util");
 var trivia = require('./trivia.js');
@@ -22,21 +23,21 @@ var BotClient = function BotClient(dotaClient, config, db, debug){
 		}
 	},1000);
 	// Load trivia file data
-	fs.readFile(config.questionListPath, 'utf8', function(err, data) {
+	fs.readFile(path.resolve(__dirname,config.questionListPath), 'utf8', function(err, data) {
 		if (err) throw err;
 		self.triviaClient.questionData = data.trim('\n').split('\n').shuffle();
 	});
-	fs.readFile(config.wordListPath, 'utf8', function(err, data) {
+	fs.readFile(path.resolve(__dirname,config.wordListPath), 'utf8', function(err, data) {
 		if (err) throw err;
 		self.triviaClient.wordListData = data.trim('\n').split('\n').shuffle();
 	});
-	fs.readFile(config.sortListPath, 'utf8', function(err, data) {
+	fs.readFile(path.resolve(__dirname,config.sortListPath), 'utf8', function(err, data) {
 		if (err) throw err;
 		self.triviaClient.sortListData = data.trim('\n').split('\n').shuffle();
 	});
 	
 	// Load ignore list
-	fs.readFile(config.ignoreListPath, 'utf8', function(err, data) {
+	fs.readFile(path.resolve(__dirname,config.ignoreListPath), 'utf8', function(err, data) {
 		if (err) throw err;
 		self.ignoreList = data.trim('\n').split('\n');
 	});
@@ -224,7 +225,7 @@ BotClient.prototype.updateFiles = function(cmd, args, userId, personaName, chatO
 }
 
 BotClient.prototype.downloadFile = function(url, dest, callback) {
-  var file = fs.createWriteStream(dest);
+  var file = fs.createWriteStream(path.resolve(__dirname,dest));
   var request = http.get(url, function(response) {
     response.pipe(file);
     file.on('finish', function() {
@@ -255,7 +256,7 @@ BotClient.prototype.handleDatabaseBackup = function() {
 BotClient.prototype.doDatabaseBackup = function(callback) {
 	var self = this;
 	console.log('starting database backup');
-	var args = ['--db', self.config.databaseName, '--collection', 'users'],
+	var args = ['--db', self.config.databaseName, '--collection', 'users', '--out', path.resolve(__dirname,self.config.dumpPath)],
 		mongodump = spawn(self.config.mongodump, args);
 	mongodump.stdout.on('data', function (data) {
 		console.log('stdout: ' + data);
@@ -313,14 +314,14 @@ BotClient.prototype.uploadToFTP = function(callback) {
 	var c = new Client();
 	
 	var getFiles = function(dir) {
-		var files = fs.readdirSync(dir);
+		var files = fs.readdirSync(path.resolve(__dirname,dir));
 		c.mkdir(dir, function(err) {
 			console.log(err);
 		});
 		for(var i in files){
 			if (!files.hasOwnProperty(i)) continue;
 			var name = dir+'/'+files[i];
-			if (fs.statSync(name).isDirectory()){
+			if (fs.statSync(path.resolve(__dirname,name)).isDirectory()){
 				getFiles(name);
 			}else{
 				c.put(name,name, function(err, stream) {
