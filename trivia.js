@@ -1,5 +1,3 @@
-global.config = require("./config_test");
-
 var http = require("http");
 var path = require("path");
 var fs = require("fs");
@@ -58,7 +56,6 @@ TriviaPlugin.prototype.destroy = function () {
 }
 
 TriviaPlugin.prototype.onRoundEnd = function () {
-    console.log('onRoundEnd');
     if (this.triviaStarted) {
         if (this.onRoundEndStop) {
             this.stop();
@@ -126,7 +123,6 @@ TriviaPlugin.prototype.handlers['trivia'] = function (args, accountId, personaNa
     }
 }
 TriviaPlugin.prototype.handlers['stats'] = function (args, accountId, personaName, chatObject) {
-    this.bot.messageQueue.push([this.config.channel, 'stats']);
     var self = this;
     this.userCollection.get(chatObject.accountId, function (user) {
         self.userCollection.getRank(user.accountId, function (rank) {
@@ -155,7 +151,60 @@ TriviaPlugin.prototype.handlers['cancel'] = function (args, accountId, personaNa
     }
 }
 TriviaPlugin.prototype.handlers['top'] = function (args, accountId, personaName, chatObject) {
-    this.bot.messageQueue.push([this.config.channel, 'top']);
+	var self = this;
+    switch (args[0]) {
+        case 'all':
+        case 'alltime':
+        case 'all-time':
+        case 'overall':
+        case 'total':
+            self.userCollection.getTop(function (docs) {
+                var message = '';
+                for (var i=0;i<docs.length;i++) {
+                    message += docs[i].personaName + ' - ' + docs[i].points + ', ';
+                }
+                message = 'Top 10 all-time: ' + message.substring(0,message.length-2) + '.'
+                self.bot.messageQueue.push([self.config.channel, message]);
+            }, 'all');
+        break;
+        case 'week':
+        case 'weekly':
+            self.userCollection.getTop(function (docs) {
+                var message = '';
+                for (var i=0;i<docs.length;i++) {
+                    message += docs[i].personaName + ' - ' + docs[i].total + ', ';
+                }
+                message = 'Top 10 this week: ' + message.substring(0,message.length-2) + '.'
+                self.bot.messageQueue.push([self.config.channel, message]);
+            }, 'week');
+        break;
+        case 'day':
+        case 'daily':
+            self.userCollection.getTop(function (docs) {
+                var message = '';
+                for (var i=0;i<docs.length;i++) {
+                    message += docs[i].personaName + ' - ' + docs[i].total + ', ';
+                }
+                message = 'Top 10 today: ' + message.substring(0,message.length-2) + '.'
+                self.bot.messageQueue.push([self.config.channel, message]);
+            }, 'day');
+        break;
+        case 'hour':
+        case 'hourly':
+        case 'recent':
+        case 'now':
+        default:
+            self.userCollection.getTop(function (docs) {
+                var message = '';
+                for (var i=0;i<docs.length;i++) {
+                    message += docs[i].personaName + ' - ' + docs[i].total + ', ';
+                }
+                message = 'Top 10 past hour: ' + message.substring(0,message.length-2) + '.'
+                self.bot.messageQueue.push([self.config.channel, message]);
+            }, 'hour');
+        break;
+    }
+
 }
 
 exports.TriviaPlugin = TriviaPlugin;

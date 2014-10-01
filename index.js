@@ -1,10 +1,10 @@
-global.config = require("./config_test");
+global.config = require("./config");
 
 var steam = require("steam"),
     path = require("path"),
     util = require("util"),
     fs = require("fs"),
-    dota2 = require("../"),
+    dota2 = require("dota2"),
     bot = new steam.SteamClient(),
     Dota2 = new dota2.Dota2Client(bot, true),
 	BotClient = require("./bot_client.js").BotClient,

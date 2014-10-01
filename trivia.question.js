@@ -37,7 +37,7 @@ Array.prototype.shuffle = function() {
 }
 
 var Hint = function Hint(answer, maxHints) {
-    this.count = 0;
+    this.count = answer.length == 0 ? 1 : 0;
     
     this.value = new Array(answer.length + 1).join('*');
     for(var i = 0; i < answer.length; i++) {
@@ -57,7 +57,7 @@ var Hint = function Hint(answer, maxHints) {
     this.hiddenIndicesLength = this.hiddenIndices.length;
     this.maxHints = this.hiddenIndicesLength == 1 ? 1 : Math.min(this.hiddenIndicesLength - 1, maxHints);
     this.charsPerHint = this.hiddenIndicesLength == 1 ? 0 : Math.floor((this.hiddenIndicesLength - 1 ) / this.maxHints);
-    console.log(this.hiddenIndicesLength, this.maxHints, this.charsPerHint);
+    //console.log(this.hiddenIndicesLength, this.maxHints, this.charsPerHint);
     this.get = function () {
         if (this.count > 0 && this.count <= this.maxHints) {
             for(var i = 0; i < this.charsPerHint; i++) {

@@ -1,7 +1,6 @@
-global.config = require("./config_test");
-
 var fs = require("fs");
 var path = require("path");
+var util = require("util");
 var MongoClient = require('mongodb').MongoClient;
 //var MongoClient = require('./tests/mock.mongodb.js').MongoClient;
 
@@ -17,19 +16,18 @@ var UserCollection = function UserCollection(config) {
     this.scoreHourlyCollection = null;
     this.scoreDailyCollection = null;
     this.scoreWeeklyCollection = null;
-    this.scoreMonthlyCollection = null;
     this.db = null;
     this.config = config;
     this.get = function (accountId, callback) {
         this.userCollection.findOne({accountId:accountId}, function (err, user) {
-            if (err) console.log('findOne error');
+            if (err) util.log('findOne error');
             if (user) {
                 callback(user);
             }
             else {
                 var newUser = new User(accountId);
                 self.userCollection.insert(newUser, {w:1}, function(err, result) {
-                    if (err) console.log('insert error');
+                    if (err) util.log('insert error');
                     callback(newUser);
                 });            
             }
@@ -39,26 +37,70 @@ var UserCollection = function UserCollection(config) {
         var self = this;
         this.get(accountId, function (user) {
             self.userCollection.find({ points: { $gt: user.points } }).count(function(err, count) {
-                if (err) console.log('count error');
+                if (err) util.log('count error');
                 callback(count+1);
             });
         });
     }
+    this.getTop = function (callback, type) {
+        switch (type) {
+            case 'all':
+                this.userCollection.find().sort({points:-1}).limit(10).toArray(function(err, items){
+                    if (!err) callback(items);
+                });
+            break;
+            case 'week':
+                this.scoreWeeklyCollection.aggregate([{$group:{_id: { accountId: "$accountId" }, total: { $sum: "$points" }, count: { $sum: 1 }, personaName: { $min: "$personaName" } }}], function(err, items) {
+                    if (!err) {
+                        if (items.length > 10) {
+                            callback(items.slice(0, 10));
+                        }
+                        else {
+                            callback(items);
+                        }
+                    }
+                });
+            break;
+            case 'day':
+                this.scoreDailyCollection.aggregate([{$group:{_id: { accountId: "$accountId" }, total: { $sum: "$points" }, count: { $sum: 1 }, personaName: { $min: "$personaName" } }}], function(err, items) {
+                    if (!err) {
+                        if (items.length > 10) {
+                            callback(items.slice(0, 10));
+                        }
+                        else {
+                            callback(items);
+                        }
+                    }
+                });
+            break;
+            case 'hour':
+            default:
+                this.scoreHourlyCollection.aggregate([{$group:{_id: { accountId: "$accountId" }, total: { $sum: "$points" }, count: { $sum: 1 }, personaName: { $min: "$personaName" } }}], function(err, items) {
+                    console.log(err, items);
+                    if (!err) {
+                        if (items.length > 10) {
+                            callback(items.slice(0, 10));
+                        }
+                        else {
+                            callback(items);
+                        }
+                    }
+                });
+            break;
+        }
+    }
     this.giveUserPoints = function (accountId, personaName, pointReward) {
         this.userCollection.update({accountId:accountId}, {$inc:{points:pointReward}, $set:{personaName:personaName}}, {w:1}, function(err, result) {
-            if (err) console.log('update error');
+            if (err) util.log('update error userCollection', accountId, personaName, pointReward);
         });
-        this.scoreHourlyCollection.insert({"createdAt": new Date(), "points": pointReward, "accountId": accountId}, {w:1}, function(err, result) {
-            if (err) console.log('insert error');
+        this.scoreHourlyCollection.insert({"createdAt": new Date(), "points": pointReward, "accountId": accountId, "personaName": personaName}, {w:1}, function(err, result) {
+            if (err) util.log('insert error scoreHourlyCollection', accountId, personaName, pointReward);
         });
-        this.scoreDailyCollection.insert({"createdAt": new Date(), "points": pointReward, "accountId": accountId}, {w:1}, function(err, result) {
-            if (err) console.log('insert error');
+        this.scoreDailyCollection.insert({"createdAt": new Date(), "points": pointReward, "accountId": accountId, "personaName": personaName}, {w:1}, function(err, result) {
+            if (err) util.log('insert error scoreDailyCollection', accountId, personaName, pointReward);
         });
-        this.scoreWeeklyCollection.insert({"createdAt": new Date(), "points": pointReward, "accountId": accountId}, {w:1}, function(err, result) {
-            if (err) console.log('insert error');
-        });
-        this.scoreMonthlyCollection.insert({"createdAt": new Date(), "points": pointReward, "accountId": accountId}, {w:1}, function(err, result) {
-            if (err) console.log('insert error');
+        this.scoreWeeklyCollection.insert({"createdAt": new Date(), "points": pointReward, "accountId": accountId, "personaName": personaName}, {w:1}, function(err, result) {
+            if (err) util.log('insert error scoreWeeklyCollection', accountId, personaName, pointReward);
         });
     }
     this.updateUserStreak = function (accountId, streak) {
@@ -66,7 +108,7 @@ var UserCollection = function UserCollection(config) {
         this.get(accountId, function (user) {
             if (user.bestStreak < streak) {
                 self.userCollection.update({accountId:accountId}, {$set:{bestStreak:streak}}, {w:1}, function(err, result) {
-                    if (err) console.log('update error');
+                    if (err) util.log('update error userCollection', accountId, streak);
                 });
             }
         });
@@ -75,39 +117,30 @@ var UserCollection = function UserCollection(config) {
     var self = this;
     MongoClient.connect(this.config.databaseAddress + this.config.databaseName, function(err, db) {
         if(!err) {
-            console.log("We are connected to " + self.config.databaseAddress + self.config.databaseName);
+            util.log("We are connected to " + self.config.databaseAddress + self.config.databaseName);
             self.db = db;
             self.db.createCollection("users", function (err, collection) {
-                if (err) console.log('collection error');
+                if (err) util.log('collection error');
                 self.userCollection = collection;
             });
             self.db.createCollection("scoresHourly", function (err, collection) {
-                if (err) console.log('collection error');
+                if (err) util.log('collection error');
                 self.scoreHourlyCollection = collection;
-                console.log(err);
-                self.scoreHourlyCollection.ensureIndex( { "createdAt": 1 }, { expireAfterSeconds: 10 }, function (err, indexName) {});
+                self.scoreHourlyCollection.ensureIndex( { "createdAt": 1 }, { expireAfterSeconds: 3600 }, function (err, indexName) {});
             });
             self.db.createCollection("scoresDaily", function (err, collection) {
-                if (err) console.log('collection error');
+                if (err) util.log('collection error');
                 self.scoreDailyCollection = collection;
-                console.log(err);
-                self.scoreDailyCollection.ensureIndex( { "createdAt": 1 }, { expireAfterSeconds: 240 }, function (err, indexName) {});
+                self.scoreDailyCollection.ensureIndex( { "createdAt": 1 }, { expireAfterSeconds: 86400 }, function (err, indexName) {});
             });
             self.db.createCollection("scoresWeekly", function (err, collection) {
-                if (err) console.log('collection error');
+                if (err) util.log('collection error');
                 self.scoreWeeklyCollection = collection;
-                console.log(err);
-                self.scoreWeeklyCollection.ensureIndex( { "createdAt": 1 }, { expireAfterSeconds: 1680 }, function (err, indexName) {});
-            });
-            self.db.createCollection("scoresMonthly", function (err, collection) {
-                if (err) console.log('collection error');
-                self.scoreMonthlyCollection = collection;
-                console.log(err);
-                self.scoreMonthlyCollection.ensureIndex( { "createdAt": 1 }, { expireAfterSeconds: 52080 }, function (err, indexName) {});
+                self.scoreWeeklyCollection.ensureIndex( { "createdAt": 1 }, { expireAfterSeconds: 604800 }, function (err, indexName) {});
             });
         }
         else {
-            console.log("Not connected to " + self.config.databaseAddress + self.config.databaseName);
+            util.log("Not connected to " + self.config.databaseAddress + self.config.databaseName);
         }
 
     });

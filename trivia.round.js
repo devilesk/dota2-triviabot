@@ -33,21 +33,20 @@ Round.prototype.elapsedTime = function () {
 Round.prototype.start = function () {
     var self = this;
     this.questionProducer.getQuestion(function (data) {
-        console.log('getQuestion');
         self.inProgress = true;
         self.question = data[0];
         self.answer = data[1];
         self.guesses = {};
         self.hint = new Hint(self.answer, self.triviaPlugin.config.maxHints);
         self.startTime = new Date();
-        self.triviaPlugin.bot.messageQueue.push([self.triviaPlugin.config.channel, self.question + self.answer]);
+        self.triviaPlugin.bot.messageQueue.push([self.triviaPlugin.config.channel, self.question]);
         self.answered = false;
         clearInterval(self.timer);
         self.timer = setInterval(function () {
             if (!this.answered) {
                 var prevCount = self.count;
                 var isUnansweredCheck = function () {
-                    console.log('isUnansweredCheck', !self.answered && prevCount == self.count, !self.answered, prevCount, self.count);
+                    //console.log('isUnansweredCheck', !self.answered && prevCount == self.count, !self.answered, prevCount, self.count);
                     return !self.answered && prevCount == self.count;
                 }
                 if (self.hint.count <= self.hint.maxHints) {
@@ -57,13 +56,13 @@ Round.prototype.start = function () {
                     clearInterval(self.timer);
                     var streakMessage = self.getEndStreakMessage();
                     var reply = util.format("Time's up! The answer is %s.%s", self.answer, streakMessage);
-                    self.triviaPlugin.bot.messageQueue.push([self.triviaPlugin.config.channel, 'Time almost up...']);
+                    //self.triviaPlugin.bot.messageQueue.push([self.triviaPlugin.config.channel, 'Time almost up...']);
                     self.triviaPlugin.bot.messageQueue.push([self.triviaPlugin.config.channel, reply, self.unansweredEnd.bind(self), isUnansweredCheck]);
                 }
             }
         }, self.triviaPlugin.config.hintInterval);
     }, function (reason) {
-        console.log(reason);
+        util.log(reason);
     });
 }
 
@@ -73,7 +72,6 @@ Round.prototype.isUnanswered = function() {
 
 Round.prototype.unansweredEnd = function () {
     if (this.inProgress) {
-        console.log('unansweredEnd');
         this.unansweredCount++;
         this.streak = {
             accountId: null,
@@ -103,14 +101,12 @@ Round.prototype.destroy = function () {
     
 Round.prototype.processMessage = function (channel, personaName, message, chatObject) {
     if (this.inProgress && !this.answered) {
-        console.log('In-game in', channel, ':', personaName, message);
+        //console.log('In-game in', channel, ':', personaName, message);
         if (message.toLowerCase().trim() === this.answer.toLowerCase().trim()) {
-            console.log('correct answer');
             this.answered = true;
             clearInterval(this.timer);
             var self = this;
             this.triviaPlugin.userCollection.get(chatObject.accountId, function (user) {
-                console.log('userCollection get');
                 var pointReward = self.getPointsForAnswer(chatObject.accountId);
                 self.triviaPlugin.userCollection.giveUserPoints(chatObject.accountId, chatObject.personaName, pointReward);
                 var streakMessage = self.getStreakMessage(chatObject);

@@ -1,18 +1,15 @@
 {
   "name": "dota2-triviabot",
-  "version": "0.0.0",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
     "start": "node index"
   },
   "dependencies": {
+    "node-dota2": "git://github.com/RJacksonm1/node-dota2.git",
     "mongodb": "*",
-    "request": "*",
     "steam": "0.6.6",
     "steam-trade": "git://github.com/seishun/node-steam-trade.git",
-    "vdf": "*",
-    "deferred": "*",
-    "express": "*",
-    "jade": "*"
+    "express": "*"
   }
 }

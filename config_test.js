@@ -14,8 +14,8 @@ config.restartPrompt = "Bot suspects that its questions aren't being seen and wi
 
 config.ownerId = <your account ID number, the lower 32 bits of your steam id>;
 config.ownerId64 = "<your account Steam64 ID number>";
-config.ownerChannel = "devilesk";
-config.channel = "devilesk2";
+config.ownerChannel = "devilesk2";
+config.channel = "devilesk3";
 config.cmdChar = "!";
 config.processUserCmdsWait = 5000;
 config.lastCmdSendTimeWait = 60000;

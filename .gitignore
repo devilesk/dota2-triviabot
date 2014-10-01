@@ -5,3 +5,4 @@ tests/
 web/
 questions/
 sentry
+npm-debug.log
