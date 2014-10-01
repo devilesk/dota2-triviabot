@@ -1,7 +1,7 @@
 config.js
 config_staging.js
 node_modules/
-tmp/all
-tmp/wordlist
-tmp/sortlist
+tests/
+web/
+questions/
 sentry

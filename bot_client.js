@@ -1,343 +1,228 @@
+// TODO: mongo capped collection for logging.
+
 var http = require("http");
 var path = require("path");
 var fs = require("fs");
 var util = require("util");
-var trivia = require('./trivia.js');
-var spawn = require('child_process').spawn;
-var nodemailer = require("nodemailer");
-var Client = require('ftp');
+var EventEmitter = require("events").EventEmitter;
+var loadFile = require("./common.js").loadFile;
+var tokenize = require("./common.js").tokenize;
 
-var BotClient = function BotClient(dotaClient, config, db, debug){
-	var self = this;
-	self.dotaClient = dotaClient;
-	self.config = config;
-	self.debug = false || debug;
-	self.db = db;
-	self.triviaClient = new trivia.Trivia(this, config, db, debug);
-	self.started = false;
-	self.queuedMessages = [];
-	self.queuedMessageLoop = setInterval(function() {
-		if (self.queuedMessages.length > 0) {
-			self.dotaClient.sendMessage(self.queuedMessages[0][0],self.queuedMessages[0][1]);
-			self.queuedMessages = self.queuedMessages.slice(1);
-		}
-	},1000);
-	// Load trivia file data
-	fs.readFile(path.resolve(__dirname,config.questionListPath), 'utf8', function(err, data) {
-		if (err) throw err;
-		self.triviaClient.questionData = data.trim('\n').split('\n').shuffle();
-	});
-	fs.readFile(path.resolve(__dirname,config.wordListPath), 'utf8', function(err, data) {
-		if (err) throw err;
-		self.triviaClient.wordListData = data.trim('\n').split('\n').shuffle();
-	});
-	fs.readFile(path.resolve(__dirname,config.sortListPath), 'utf8', function(err, data) {
-		if (err) throw err;
-		self.triviaClient.sortListData = data.trim('\n').split('\n').shuffle();
-	});
-	
-	// Load ignore list
-	fs.readFile(path.resolve(__dirname,config.ignoreListPath), 'utf8', function(err, data) {
-		if (err) throw err;
-		self.ignoreList = data.trim('\n').split('\n');
-	});
-	
-	self.userCmdQueue = [];
-	self.lastCmdSendTime = {};
-	
-	// Process user command loop
-	self.processUserCmds = setInterval(function() {
-		if (self.userCmdQueue.length > 0) {
-			var userCmd = self.userCmdQueue.shift();
-			switch (userCmd[0]) {
-				case 'about':
-				case 'help':
-				case 'info':
-					self.sendHelpMessage();
-				break;
-				case 'report':
-				case 'alert':
-					self.sendReportMessage(userCmd[0], userCmd[1], userCmd[2], userCmd[3], userCmd[4]);
-				break;
-				case 'id':
-					self.getUserIdCommand(userCmd[0], userCmd[1], userCmd[2], userCmd[3], userCmd[4]);
-				break;
-				default:
-					self.triviaClient.handleCommand(userCmd[0], userCmd[1], userCmd[2], userCmd[3]);
-				break;
-			}
-		}
-	},self.config.processUserCmdsWait);
-};
-
-BotClient.prototype.onChatMessage = function(channel, personaName, message, chatObject) {
-	var self = this;
-	util.log(chatObject.accountId + ' ' + personaName + ': ' + message);
-	// send command messages to handler and the rest to trivia client to check if it's an answer
-	if (self.ignoreList.indexOf(chatObject.accountId.toString()) == -1) {
-		if (message.charAt(0) == self.config.cmdChar && message.length > 1) {
-			var args = message.substring(1).match(/('[^']+'|[^ ]+)/g);
-			self.handleCommand(args[0],args.slice(1),chatObject.accountId, personaName, chatObject);
-		}
-		else {
-			self.triviaClient.onChatMessage(channel, personaName, message, chatObject);
-		}
-	}
-	else {
-
-	}
-};
-
-BotClient.prototype.handleCommand = function(cmd, args, userId, personaName, chatObject) {
-	var self = this;
-	console.log('handling command', cmd);
-	if (userId == self.config.ownerId) {
-		switch (cmd) {
-			case 'update':
-				self.updateFiles(cmd,args,userId,personaName,chatObject);
-			break;
-			
-			case 'join':
-				self.dotaClient.joinChat(args.join(' ').replace(/'/g, ''));
-			break;
-			
-			case 'leave':
-				self.dotaClient.leaveChat(args.join(' ').replace(/'/g, ''));
-			break;
-			
-			case 'say':
-				self.sendMessage(args[0].replace(/'/g, ''), args.slice(1).join(' ').replace(/'/g, ''));
-			break;
-			
-			case 'announce':
-			
-			break;
-			
-			case 'about':
-			case 'help':
-			case 'info':
-				self.sendHelpMessage();
-			break;
-			
-			case 'report':
-			case 'alert':
-				self.sendReportMessage(cmd,args,userId,personaName,chatObject);
-			break;
-			
-			case 'id':
-				self.getUserIdCommand(cmd,args,userId,personaName,chatObject);
-			break;
-			
-			case 'ignore':
-				self.addIgnoreUser(cmd,args,userId,personaName,chatObject);
-			break;
-			
-			case 'trivia':
-			case 'score':
-			case 'points':
-			case 'rank':
-			case 'top':
-			case 'stats':
-			case 'question':
-			case 'cancel':
-				self.triviaClient.handleCommand(cmd,args,userId,personaName);
-			break;
-			
-			case 'backup':
-				self.handleDatabaseBackup();
-			break;
-		}
-	}
-	else {
-		var now = new Date();
-		if (self.lastCmdSendTime[userId] == undefined || now - self.lastCmdSendTime[userId] > self.config.lastCmdSendTimeWait) {
-			if (self.userCmdQueue.length < self.config.userCmdQueueMax) {
-				switch (cmd) {
-					case 'about':
-					case 'help':
-					case 'info':
-					case 'report':
-					case 'alert':
-					case 'id':
-/*					case 'score':
-					case 'points':
-					case 'rank':
-*/
-					case 'top':
-					case 'stats':
-						self.lastCmdSendTime[userId] = now;
-						self.userCmdQueue.push([cmd, args, userId, personaName, chatObject]);
-					break;
-					case 'question':
-					case 'cancel':
-						self.triviaClient.handleCommand(cmd,args,userId,personaName);
-					break;
-				}
-			}
-		}
-	}
-};
-
-BotClient.prototype.sendHelpMessage = function() {
-	var self = this;
-	self.sendMessage(self.config.channel, 'Available commands: !stats, !top scores, !top streaks, !question.\nTo send a message to the bot owner use: !report <msg>.\nYou are limited to one command every five minutes.');
-}
-
-BotClient.prototype.sendReportMessage = function(cmd, args, userId, personaName, chatObject) {
-	var self = this;
-	console.log('report command');
-	self.sendEmailNotification('Trivia Bot Report Message', personaName + '(' + chatObject.accountId + '): ' + args.join(' '));
-	self.dotaClient._client.sendMessage('76561198015512690', personaName + '(' + chatObject.accountId + '): ' + args.join(' '));
-}
-
-BotClient.prototype.getUserIdCommand = function(cmd, args, userId, personaName, chatObject) {
-	var self = this;
-	self.sendMessage(self.config.channel, personaName + '\'s account id is ' + chatObject.accountId);
-}
-
-BotClient.prototype.addIgnoreUser = function(cmd, args, userId, personaName, chatObject) {
-	var self = this;
-	fs.appendFile('./ignorelist', args[0].toString() + '\n', function (err) {
-		if (err) {
-			console.log(err);
-		}
-		else {
-			self.ignoreList.push(args[0].toString());
-			self.sendMessage(self.config.channel, 'User with account id ' + args[0] + ' has been ignored.');
-		}
-	});
-}
-
-BotClient.prototype.sendMessage = function(channel,msg) {
-	var self = this;
-	if (!self.debug && self.started) self.queuedMessages.push([channel,msg]);
-	console.log('queued msg',channel,msg);
-}
-
-BotClient.prototype.updateFiles = function(cmd, args, userId, personaName, chatObject) {
-	var self = this;
-	console.log('update file command');
-	self.downloadFile(args[0],args[1], function() {
-		self.sendMessage(config.ownerChannel, 'File at ' + args[0] + ' downloaded to ' + args[1] + '.');
-		console.log('File at ' + args[0] + ' downloaded to ' + args[1] + '.');	
-	});
-
-}
-
-BotClient.prototype.downloadFile = function(url, dest, callback) {
-  var file = fs.createWriteStream(path.resolve(__dirname,dest));
-  var request = http.get(url, function(response) {
-    response.pipe(file);
-    file.on('finish', function() {
-      file.close();
-      callback();
+var BotClient = function BotClient(dota, config, pluginList){
+    var self = this;
+    this.dota = dota;
+    this.config = config;
+    this.plugins = [];
+    this.messageQueue = [];
+    this.commandQueue = [];
+    this.ignoreList = [];
+    
+    pluginList.map(function (plugin) {
+        this.plugins.push(new plugin(self));
+    }, this);
+    
+    loadFile(this.config.ignoreListPath, function (data) {
+        if (data) self.ignoreList = data.trim('\n').split('\n');
     });
-  });
-}
-
-BotClient.prototype.stop = function(callback) {
-	var self = this;
-	self.started = false;
-	self.triviaClient.stop(function() {
-		console.log('bot stopped');
-		callback();
-	});
-}
-
-BotClient.prototype.handleDatabaseBackup = function() {
-	var self = this;
-	self.triviaClient.stop(function() {
-		self.doDatabaseBackup(function() {
-			self.triviaClient.start();
-		});
-	});
-}
-
-BotClient.prototype.doDatabaseBackup = function(callback) {
-	var self = this;
-	console.log('starting database backup');
-	var args = ['--db', self.config.databaseName, '--collection', 'users', '--out', path.resolve(__dirname,self.config.dumpPath)],
-		mongodump = spawn(self.config.mongodump, args);
-	mongodump.stdout.on('data', function (data) {
-		console.log('stdout: ' + data);
-	});
-	mongodump.stderr.on('data', function (data) {
-		console.log('stderr: ' + data);
-	});
-	mongodump.on('exit', function (code) {
-		console.log('mongodump exited with code ' + code);
-		self.uploadToFTP();
-		callback();
-	});
-}
-
-// create reusable transport method (opens pool of SMTP connections)
-var smtpTransport = nodemailer.createTransport("SMTP",{
-	host: config.emailHost, // hostname
-	secureConnection: false, // use SSL
-	port: 587, // port for secure SMTP
-    auth: {
-        user: config.emailUser,
-        pass: config.emailPass
-    }
-});
-
-BotClient.prototype.sendEmailNotification = function(subject, text) {
-	var self = this;
-	if (self.config.emailNotifications) {
-		var timeStamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
-		// setup e-mail data with unicode symbols
-		var mailOptions = {
-			from: "Trivia Bot <" + self.config.emailUser + ">", // sender address
-			to: self.config.emailRecipient, // list of receivers
-			subject: subject, // Subject line
-			text: timeStamp + ' ' + text, // plaintext body
-			html: timeStamp + ' ' + text // html body
-		}
-		
-		// send mail with defined transport object
-		smtpTransport.sendMail(mailOptions, function(error, response){
-			if(error){
-				console.log(error);
-			}else{
-				console.log("Email sent: " + response.message);
-			}
-
-			// if you don't want to use this transport object anymore, uncomment following line
-			//smtpTransport.close(); // shut down the connection pool, no more messages
-		});
-	}
 };
 
+BotClient.prototype.lastCmdSendTime = {};
 
-BotClient.prototype.uploadToFTP = function(callback) {
-	var c = new Client();
-	
-	var getFiles = function(dir) {
-		var files = fs.readdirSync(path.resolve(__dirname,dir));
-		c.mkdir(dir, function(err) {
-			console.log(err);
-		});
-		for(var i in files){
-			if (!files.hasOwnProperty(i)) continue;
-			var name = dir+'/'+files[i];
-			if (fs.statSync(path.resolve(__dirname,name)).isDirectory()){
-				getFiles(name);
-			}else{
-				c.put(name,name, function(err, stream) {
-					console.log(err, stream);
-				});
-				console.log(name);
-			}
+BotClient.prototype.start = function () {
+    var self = this;
+    
+    this.messageQueueProcessInterval = setInterval(this.messageQueueProcess.bind(this), this.config.sendMessageDelay);
+    
+    this.commandQueueProcess = setInterval(function () {
+        if (self.commandQueue.length > 0) {
+            var data = self.commandQueue.shift();
+            self.processCommand(data[0], data[1], data[2], data[3], data[4]);
+        }
+    }, this.config.processUserCmdsWait);
+    
+    this.plugins.map(function (plugin) {
+        plugin.start();
+    });
+}
+
+BotClient.prototype.messageQueueProcess = function () {
+    if (this.messageQueue.length > 0) {
+        var data = this.messageQueue.shift();
+        if (data[3]) {
+            if (data[3]()) {
+                this.sendMessage(data[0], data[1]);
+            }
+            else {
+                this.messageQueueProcess();
+                return;
+            }
+        }
+        else {
+            this.sendMessage(data[0], data[1]);
+        }
+        if (data[2]) data[2]();
+    }
+}
+
+BotClient.prototype.kill = function () {
+    clearInterval(this.messageQueueProcessInterval);
+    clearInterval(this.commandQueueProcess);
+    for (var i = 0; i < this.plugins.length; i++) {
+        this.plugins[i].destroy();
+    }
+    this.dota.exit();
+    var self = this;
+    setTimeout(function () {
+        self.dota._client.logOff();
+        setTimeout(function () {
+            process.exit(0);
+        }, 1000);
+    }, 1000);
+}
+
+BotClient.prototype.stop = function () {
+    clearInterval(this.messageQueueProcessInterval);
+    clearInterval(this.commandQueueProcess);
+    this.plugins.map(function (plugin) {
+        plugin.stop();
+    });
+    this.messageQueue.length = 0;
+}
+
+BotClient.prototype.restart = function (plugin) {
+    if (plugin) {
+        for (var i = 0; i < this.plugins.length; i++) {
+            if (this.plugins[i] == plugin) {
+                this.plugins[i] == new plugin.constructor(this);
+                this.plugins[i].start();
+                return;
+            }
+        }
+    }
+    else {
+        this.kill();
+    }
+}
+
+BotClient.prototype.onChatMessage = function (channel, personaName, message, chatObject) {
+	if (this.ignoreList.indexOf(chatObject.accountId.toString()) === -1) {
+		if (message.charAt(0) === this.config.cmdChar && message.length > 1) {
+            var args = tokenize(message.substring(1));
+            if (chatObject.accountId == this.config.ownerId) {
+                this.processCommand(args[0], args.slice(1), chatObject.accountId, personaName, chatObject);
+            }
+            else {
+                var now = new Date();
+                if (this.lastCmdSendTime[chatObject.accountId] === undefined || now - this.lastCmdSendTime[chatObject.accountId] > this.config.lastCmdSendTimeWait) {
+                    if (this.commandQueue.length < this.config.userCmdQueueMax) {
+                        this.commandQueue.push([
+                            args[0],
+                            args.slice(1),
+                            chatObject.accountId,
+                            personaName,
+                            chatObject
+                        ]);
+                        this.lastCmdSendTime[chatObject.accountId] = now;                    
+                    }
+                }
+            }
+		}
+		else {
+            this.plugins.map(function (plugin) {
+                plugin.onChatMessage(channel, personaName, message, chatObject);
+            });
+            this.processMessage(channel, personaName, message, chatObject);
 		}
 	}
-	
-	c.on('ready', function() {
-		getFiles(config.dumpPath);
-	});
-	c.connect({host:config.ftpHost,user:config.ftpUser,password:config.ftpPass});
+}
 
+BotClient.prototype.sendMessage = function (channel, msg) {
+    this.dota.sendMessage(channel, msg);
+}
 
+BotClient.prototype.processMessage = function (channel, personaName, message, chatObject) {}
+
+BotClient.prototype.processCommand = function (cmd, args, accountId, personaName, chatObject) {
+    var handler = this.getHandler(cmd);
+    if (handler) {
+        if (this.hasHandlerPermission(handler, accountId)) {
+            this.handlers[handler].call(this, args, accountId, personaName, chatObject);
+        }
+    }
+    else {
+        this.plugins.map(function (plugin) {
+            plugin.processCommand(cmd, args, accountId, personaName, chatObject);
+        });
+    }
+}
+
+BotClient.prototype.commands = [
+    { handler: 'stop', aliases: ['stop'] },
+    { handler: 'restart', aliases: ['restart'] },
+    { handler: 'say', aliases: ['say'] },
+    { handler: 'report', aliases: ['report', 'alert'] },
+    { handler: 'ignore', aliases: ['ignore', 'ban'] },
+    { handler: 'unignore', aliases: ['unignore', 'unban'] },
+    { handler: 'join', aliases: ['join'] },
+    { handler: 'leave', aliases: ['leave'] }
+];
+BotClient.prototype.userCommands = ['report'];
+BotClient.prototype.getHandler = function (cmd) {
+    for (var i = 0; i < this.commands.length; i++) {
+        if (this.commands[i].aliases.indexOf(cmd) !== -1) {
+            return this.commands[i].handler;
+        }
+    }
+    return null;
+}
+
+BotClient.prototype.hasHandlerPermission = function (handler, accountId) {
+    return (accountId === this.config.ownerId) || (this.userCommands.indexOf(handler) !== -1);
+}
+
+BotClient.prototype.handlers = {};
+BotClient.prototype.handlers['stop'] = function (args, accountId, personaName, chatObject) {
+    this.stop();
+}
+BotClient.prototype.handlers['restart'] = function (args, accountId, personaName, chatObject) {
+    this.restart();
+}
+BotClient.prototype.handlers['say'] = function (args, accountId, personaName, chatObject) {
+    this.dota.sendMessage(args[0], args.slice(1).join(' '));
+}
+BotClient.prototype.handlers['join'] = function (args, accountId, personaName, chatObject) {
+    this.dota.joinChat(args.join(' ').replace(/'/g, ''));
+}
+BotClient.prototype.handlers['leave'] = function (args, accountId, personaName, chatObject) {
+    this.dota.leaveChat(args.join(' ').replace(/'/g, ''));
+}
+BotClient.prototype.handlers['report'] = function (args, accountId, personaName, chatObject) {
+	this.dota._client.sendMessage(this.config.ownerId64, personaName + '(' + chatObject.accountId + '): ' + args.join(' '));
+}
+BotClient.prototype.handlers['ignore'] = function (args, accountId, personaName, chatObject) {
+    if (this.ignoreList.indexOf(args[0]) === -1 && args[0] !== this.config.ownerId.toString()) {
+        this.ignoreList.push(args[0]);
+    }
+    this.writeIgnoreListToFile();
+}
+BotClient.prototype.handlers['unignore'] = function (args, accountId, personaName, chatObject) {
+    for (var i = this.ignoreList.length - 1; i >= 0; i--) {
+        if (this.ignoreList[i] === args[0]) {
+            this.ignoreList.splice(i, 1);
+        }
+    }
+    this.writeIgnoreListToFile();
+}
+
+BotClient.prototype.writeIgnoreListToFile = function () {
+    var data = this.ignoreList.join('\n');
+    fs.writeFile(this.config.ignoreListPath, data, function(err) {
+        if(err) {
+            console.log(err);
+        } else {
+            console.log("Ignore list saved.");
+        }
+    });
 }
 
 exports.BotClient = BotClient;

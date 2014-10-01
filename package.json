@@ -6,14 +6,13 @@
     "start": "node index"
   },
   "dependencies": {
-    "ftp": "*",
-    "graceful-fs": "*",
     "mongodb": "*",
-    "nodemailer": "*",
     "request": "*",
-    "steam": "0.6.1",
+    "steam": "0.6.6",
     "steam-trade": "git://github.com/seishun/node-steam-trade.git",
     "vdf": "*",
-    "deferred": "*"
+    "deferred": "*",
+    "express": "*",
+    "jade": "*"
   }
 }
