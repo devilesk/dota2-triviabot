@@ -18,14 +18,14 @@ var UserCollection = function UserCollection(config) {
     this.scoreWeeklyCollection = null;
     this.db = null;
     this.config = config;
-    this.get = function (accountId, callback) {
+    this.get = function (accountId, callback, personaName) {
         this.userCollection.findOne({accountId:accountId}, function (err, user) {
             if (err) util.log('findOne error');
             if (user) {
                 callback(user);
             }
             else {
-                var newUser = new User(accountId);
+                var newUser = new User(accountId, 0, 0, personaName);
                 self.userCollection.insert(newUser, {w:1}, function(err, result) {
                     if (err) util.log('insert error');
                     callback(newUser);

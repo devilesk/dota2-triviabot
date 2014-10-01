@@ -129,7 +129,7 @@ TriviaPlugin.prototype.handlers['stats'] = function (args, accountId, personaNam
             var message = util.format('%s: %s points, rank %s, best streak %s.', personaName, user.points, rank, user.bestStreak);
             self.bot.messageQueue.push([self.config.channel, message]);
         });
-    });
+    }, personaName);
 }
 
 TriviaPlugin.prototype.handlers['question'] = function (args, accountId, personaName, chatObject) {

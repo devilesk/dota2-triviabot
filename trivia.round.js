@@ -1,4 +1,3 @@
-//http://i.imgur.com/S9rsQUD.png
 var fs = require("fs");
 var path = require("path");
 var util = require("util");
@@ -110,11 +109,11 @@ Round.prototype.processMessage = function (channel, personaName, message, chatOb
                 var pointReward = self.getPointsForAnswer(chatObject.accountId);
                 self.triviaPlugin.userCollection.giveUserPoints(chatObject.accountId, chatObject.personaName, pointReward);
                 var streakMessage = self.getStreakMessage(chatObject);
-                var reply = util.format('%s is correct! The answer is %s.%s (+%s points, %s total) [%s ms]', personaName, self.answer, streakMessage, pointReward, user.points, self.elapsedTime());
+                var reply = util.format('%s is correct! The answer is %s.%s (+%s points, %s total) [%s ms]', personaName, self.answer, streakMessage, pointReward, user.points + pointReward, self.elapsedTime());
                 self.triviaPlugin.bot.messageQueue.push([self.triviaPlugin.config.channel, reply]);
                 self.unansweredCount = 0;
                 self.end();
-            });
+            }, personaName);
         }
         else {
             if (this.guesses[chatObject.accountId] === undefined) {

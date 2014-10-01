@@ -10,6 +10,7 @@
     "mongodb": "*",
     "steam": "0.6.6",
     "steam-trade": "git://github.com/seishun/node-steam-trade.git",
-    "express": "*"
+    "express": "*",
+    "hogan": "*"
   }
 }
