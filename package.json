@@ -9,8 +9,6 @@
     "node-dota2": "git://github.com/RJacksonm1/node-dota2.git",
     "mongodb": "*",
     "steam": "0.6.6",
-    "steam-trade": "git://github.com/seishun/node-steam-trade.git",
-    "express": "*",
-    "hogan": "*"
+    "steam-trade": "git://github.com/seishun/node-steam-trade.git"
   }
 }
