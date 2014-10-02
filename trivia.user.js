@@ -50,7 +50,7 @@ var UserCollection = function UserCollection(config) {
                 });
             break;
             case 'week':
-                this.scoreWeeklyCollection.aggregate([{$group:{_id: { accountId: "$accountId" }, total: { $sum: "$points" }, count: { $sum: 1 }, personaName: { $min: "$personaName" } }}], function(err, items) {
+                this.scoreWeeklyCollection.aggregate([{$group:{_id: { accountId: "$accountId" }, total: { $sum: "$points" }, count: { $sum: 1 }, personaName: { $min: "$personaName" } }}, {$sort: {total: -1}}], function(err, items) {
                     if (!err) {
                         if (items.length > 10) {
                             callback(items.slice(0, 10));
@@ -62,7 +62,7 @@ var UserCollection = function UserCollection(config) {
                 });
             break;
             case 'day':
-                this.scoreDailyCollection.aggregate([{$group:{_id: { accountId: "$accountId" }, total: { $sum: "$points" }, count: { $sum: 1 }, personaName: { $min: "$personaName" } }}], function(err, items) {
+                this.scoreDailyCollection.aggregate([{$group:{_id: { accountId: "$accountId" }, total: { $sum: "$points" }, count: { $sum: 1 }, personaName: { $min: "$personaName" } }}, {$sort: {total: -1}}], function(err, items) {
                     if (!err) {
                         if (items.length > 10) {
                             callback(items.slice(0, 10));
@@ -75,7 +75,7 @@ var UserCollection = function UserCollection(config) {
             break;
             case 'hour':
             default:
-                this.scoreHourlyCollection.aggregate([{$group:{_id: { accountId: "$accountId" }, total: { $sum: "$points" }, count: { $sum: 1 }, personaName: { $min: "$personaName" } }}], function(err, items) {
+                this.scoreHourlyCollection.aggregate([{$group:{_id: { accountId: "$accountId" }, total: { $sum: "$points" }, count: { $sum: 1 }, personaName: { $min: "$personaName" } }}, {$sort: {total: -1}}], function(err, items) {
                     console.log(err, items);
                     if (!err) {
                         if (items.length > 10) {
