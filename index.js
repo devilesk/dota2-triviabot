@@ -97,7 +97,7 @@ onSteamFriendMessage = function(steamId, msg, EChatEntryType) {
     util.log(util.format('Steam onSteamFriendMessage %s, %s, %s', steamId, msg, EChatEntryType));
 	if (EChatEntryType == steam.EChatEntryType['ChatMsg']){
 		if (steamId != config.ownerId) {
-			bot.sendMessage(steamId, config.steamChatAutoReply);
+			bot.sendMessage(steamId, config.messages.steamChatAutoReply);
 		}
 	}
 },
